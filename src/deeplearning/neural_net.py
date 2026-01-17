@@ -14,42 +14,45 @@ The implementation follows the standard deep learning convention where each laye
 Mathematical Background
 -----------------------
 Each layer implements the chain rule for backpropagation:
-    dL/dx = dL/dy * dy/dx
+dL/dx = dL/dy * dy/dx
 where dL/dy is the upstream gradient and dy/dx is the local gradient.
 
 Example Usage
 -------------
->>> import numpy as np
->>> from neural_net import Linear, ReLU
->>>
->>> # Create a simple two-layer network
->>> linear1 = Linear(784, 128)
->>> relu = ReLU()
->>> linear2 = Linear(128, 10)
->>>
->>> # Forward pass
->>> x = np.random.randn(32, 784)  # Batch of 32 samples
->>> h1 = linear1.forward(x)
->>> h1_activated = relu.forward(h1)
->>> output = linear2.forward(h1_activated)
->>>
->>> # Backward pass (assuming dL_doutput is the gradient from loss)
->>> dL_dh1_activated = linear2.backward(dL_doutput)
->>> dL_dh1 = relu.backward(dL_dh1_activated)
->>> dL_dx = linear1.backward(dL_dh1)
->>>
->>> # Update parameters using stored gradients
->>> linear1._w -= learning_rate * linear1.dL_dW
->>> linear1._b -= learning_rate * linear1.dL_db
+.. code-block:: python
+
+    import numpy as np
+    from deeplearning.neural_net import Linear, ReLU
+
+    # Create a simple two-layer network
+    linear1 = Linear(784, 128)
+    relu = ReLU()
+    linear2 = Linear(128, 10)
+
+    # Forward pass
+    x = np.random.randn(32, 784)  # Batch of 32 samples
+    h1 = linear1.forward(x)
+    h1_activated = relu.forward(h1)
+    output = linear2.forward(h1_activated)
+
+    # Backward pass (assuming dL_doutput is the gradient from loss)
+    # dL_doutput needs to be defined elsewhere in a full example
+    # dL_dh1_activated = linear2.backward(dL_doutput)
+    # dL_dh1 = relu.backward(dL_dh1_activated)
+    # dL_dx = linear1.backward(dL_dh1)
+
+    # Update parameters using stored gradients
+    # learning_rate needs to be defined
+    # linear1._w -= learning_rate * linear1.dL_dW
+    # linear1._b -= learning_rate * linear1.dL_db
 
 References
 ----------
-- He et al., "Delving Deep into Rectifiers", https://arxiv.org/pdf/1502.01852
-- CS231n: Convolutional Neural Networks for Visual Recognition
+* He et al., "Delving Deep into Rectifiers", https://arxiv.org/pdf/1502.01852
+* CS231n: Convolutional Neural Networks for Visual Recognition
 
 Author: Phase 1 Deep Learning Assignment
 """
-
 import numpy as np
 from typing import Tuple, Optional
 
@@ -312,7 +315,7 @@ class Sigmoid:
 
     Notes
     -----
-    - Sigmoid suffers from vanishing gradients: when |x| is large, the gradient
+    - Sigmoid suffers from vanishing gradients: when ``|x|`` is large, the gradient
       approaches zero, slowing down learning.
     - The output is always positive and sums to values > 0, which can cause
       issues with zero-centered gradients.
