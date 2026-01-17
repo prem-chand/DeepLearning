@@ -22,7 +22,7 @@ This implementation is educational and demonstrates:
 
 Note: This is slower than vectorized implementations but more transparent.
 
-Author: Deep Learning from Scratch
+Author: Prem Chand
 """
 
 import numpy as np

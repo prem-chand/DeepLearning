@@ -51,7 +51,7 @@ References
 * He et al., "Delving Deep into Rectifiers", https://arxiv.org/pdf/1502.01852
 * CS231n: Convolutional Neural Networks for Visual Recognition
 
-Author: Phase 1 Deep Learning Assignment
+Author: Prem Chand
 """
 import numpy as np
 from typing import Tuple, Optional

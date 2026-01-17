@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.abspath('../../src'))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'DeepLearning'
-copyright = '2026, premchand'
-author = 'premchand'
+copyright = '2026, Prem Chand'
+author = 'Prem Chand'
 
 version = '0.1'
 release = '0.1'

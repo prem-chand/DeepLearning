@@ -77,7 +77,7 @@ References
 - CS231n: Convolutional Neural Networks for Visual Recognition
 - "Neural Networks and Deep Learning" by Michael Nielsen
 
-Author: Phase 1 Deep Learning Assignment
+Author: Prem Chand
 """
 
 import numpy as np

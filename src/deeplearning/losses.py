@@ -43,7 +43,7 @@ References
 - CS231n: Convolutional Neural Networks for Visual Recognition
 - "Deep Learning" by Goodfellow, Bengio, and Courville
 
-Author: Phase 1 Deep Learning Assignment
+Author: Prem Chand
 """
 
 import numpy as np

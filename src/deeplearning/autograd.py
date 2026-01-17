@@ -350,20 +350,20 @@ class Value:
     def backward(self) -> None:
         """
         Compute gradients for all nodes in the computational graph.
-        
+
         This method implements reverse-mode automatic differentiation
         (backpropagation). It:
         1. Builds a topological ordering of the computation graph
         2. Initializes this node's gradient to 1.0
         3. Propagates gradients backward through the graph
-        
+
         After calling backward(), all Value nodes that contributed to
         this value will have their .grad attribute set to the derivative
         of this value with respect to them.
-        
+
         Note: Gradients accumulate! Call zero_grad() before backward()
         if you want to reset gradients.
-        
+
         Examples
         --------
         >>> x = Value(2.0)
@@ -375,18 +375,21 @@ class Value:
         >>> print(y.grad)  # dz/dy = x = 2
         2.0
         """
-        # Build topological ordering
+        # Build topological ordering using iterative DFS
         topo = []
         visited = set()
+        stack = [(self, False)]  # (node, processed)
 
-        def build_topo(v):
-            if v not in visited:
-                visited.add(v)
-                for child in v._prev:
-                    build_topo(child)
-                topo.append(v)
-
-        build_topo(self)
+        while stack:
+            node, processed = stack.pop()
+            if processed:
+                topo.append(node)
+            elif node not in visited:
+                visited.add(node)
+                stack.append((node, True))  # Mark for post-processing
+                for child in node._prev:
+                    if child not in visited:
+                        stack.append((child, False))
 
         # Backward pass
         self.grad = 1.0
@@ -721,13 +724,13 @@ class Tensor:
 
         Gradient: 1 if x > 0, else 0
         """
-        out = Tensor(np.maximum(0, self.data), (self,), 'relu')
-
-        def _backward():
-            if self.requires_grad:
-                self.grad += (self.data > 0) * out.grad
-        out._backward = _backward
-        return out
+        input_data = self.data
+        return _make_activation(
+            self,
+            forward_fn=lambda x: np.maximum(0, x),
+            backward_fn=lambda grad, _: (input_data > 0) * grad,
+            op_name='relu'
+        )
 
     def tanh(self) -> 'Tensor':
         """
@@ -736,13 +739,12 @@ class Tensor:
         Gradient: 1 - tanh(x)^2
         """
         t = np.tanh(self.data)
-        out = Tensor(t, (self,), 'tanh')
-
-        def _backward():
-            if self.requires_grad:
-                self.grad += (1 - t ** 2) * out.grad
-        out._backward = _backward
-        return out
+        return _make_activation(
+            self,
+            forward_fn=lambda _: t,
+            backward_fn=lambda grad, _: (1 - t ** 2) * grad,
+            op_name='tanh'
+        )
 
     def sigmoid(self) -> 'Tensor':
         """
@@ -751,13 +753,12 @@ class Tensor:
         Gradient: sigmoid(x) * (1 - sigmoid(x))
         """
         s = 1 / (1 + np.exp(-np.clip(self.data, -500, 500)))  # Clip for numerical stability
-        out = Tensor(s, (self,), 'sigmoid')
-
-        def _backward():
-            if self.requires_grad:
-                self.grad += s * (1 - s) * out.grad
-        out._backward = _backward
-        return out
+        return _make_activation(
+            self,
+            forward_fn=lambda _: s,
+            backward_fn=lambda grad, _: s * (1 - s) * grad,
+            op_name='sigmoid'
+        )
 
     def softmax(self, axis: int = -1) -> 'Tensor':
         """
@@ -791,13 +792,13 @@ class Tensor:
 
         Gradient: 1/x
         """
-        out = Tensor(np.log(np.clip(self.data, 1e-12, None)), (self,), 'log')
-
-        def _backward():
-            if self.requires_grad:
-                self.grad += (1 / np.maximum(self.data, 1e-12)) * out.grad
-        out._backward = _backward
-        return out
+        input_data = self.data
+        return _make_activation(
+            self,
+            forward_fn=lambda x: np.log(np.clip(x, 1e-12, None)),
+            backward_fn=lambda grad, _: (1 / np.maximum(input_data, 1e-12)) * grad,
+            op_name='log'
+        )
 
     def exp(self) -> 'Tensor':
         """
@@ -805,13 +806,13 @@ class Tensor:
 
         Gradient: exp(x)
         """
-        out = Tensor(np.exp(np.clip(self.data, -500, 500)), (self,), 'exp')
-
-        def _backward():
-            if self.requires_grad:
-                self.grad += out.data * out.grad
-        out._backward = _backward
-        return out
+        exp_data = np.exp(np.clip(self.data, -500, 500))
+        return _make_activation(
+            self,
+            forward_fn=lambda _: exp_data,
+            backward_fn=lambda grad, _: exp_data * grad,
+            op_name='exp'
+        )
 
     def __getitem__(self, idx) -> 'Tensor':
         """
@@ -839,18 +840,21 @@ class Tensor:
         This initiates backpropagation from this tensor (typically a scalar loss).
         Builds topological ordering and propagates gradients backward.
         """
-        # Build topological ordering
+        # Build topological ordering using iterative DFS
         topo = []
         visited = set()
+        stack = [(self, False)]  # (node, processed)
 
-        def build_topo(v):
-            if v not in visited:
-                visited.add(v)
-                for child in v._prev:
-                    build_topo(child)
-                topo.append(v)
-
-        build_topo(self)
+        while stack:
+            node, processed = stack.pop()
+            if processed:
+                topo.append(node)
+            elif node not in visited:
+                visited.add(node)
+                stack.append((node, True))  # Mark for post-processing
+                for child in node._prev:
+                    if child not in visited:
+                        stack.append((child, False))
 
         # Initialize gradient for the output
         self.grad = np.ones_like(self.data)
@@ -967,3 +971,48 @@ def _unbroadcast(grad: np.ndarray, target_shape: Tuple[int, ...]) -> np.ndarray:
             grad = grad.sum(axis=i, keepdims=True)
 
     return grad
+
+
+def _make_activation(
+    tensor: 'Tensor',
+    forward_fn,
+    backward_fn,
+    op_name: str,
+    cache: dict = None
+) -> 'Tensor':
+    """
+    Create an activation function with forward and backward pass.
+
+    This helper reduces boilerplate for element-wise activation functions
+    by handling the common pattern of:
+    1. Compute forward pass
+    2. Create output tensor with graph connection
+    3. Define backward pass using cached values
+
+    Parameters
+    ----------
+    tensor : Tensor
+        Input tensor
+    forward_fn : callable
+        Function that computes forward pass: data -> output_data
+    backward_fn : callable
+        Function that computes gradient: (out_grad, cache) -> input_grad
+    op_name : str
+        Name of the operation for debugging
+    cache : dict, optional
+        Values to cache for backward pass (e.g., forward output for sigmoid)
+
+    Returns
+    -------
+    Tensor
+        Output tensor with backward function defined
+    """
+    out_data = forward_fn(tensor.data)
+    out = Tensor(out_data, (tensor,), op_name)
+    cached = cache if cache is not None else {}
+
+    def _backward():
+        if tensor.requires_grad:
+            tensor.grad += backward_fn(out.grad, cached)
+    out._backward = _backward
+    return out

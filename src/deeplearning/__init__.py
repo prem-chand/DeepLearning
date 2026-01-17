@@ -27,7 +27,7 @@ from deeplearning.losses import MSELoss, CrossEntropyLoss
 from deeplearning.mnist_mlp import TwoLayerMLP
 
 __version__ = "0.1.0"
-__author__ = "Deep Learning Assignment"
+__author__ = "Prem Chand"
 
 __all__ = [
     "Linear",

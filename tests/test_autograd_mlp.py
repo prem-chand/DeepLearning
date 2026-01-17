@@ -8,7 +8,7 @@ This module tests the autograd-based MLP implementation, including:
 3. Gradient verification against manual implementation
 4. Training convergence
 
-Author: Deep Learning Assignment - Autograd Extension
+Author: Prem Chand
 """
 
 import pytest
@@ -21,6 +21,7 @@ from deeplearning.autograd_mlp import (
     SigmoidAutograd,
     TanhAutograd,
     SoftmaxAutograd,
+    CrossEntropyLossAutograd,
     TwoLayerMLPAutograd,
     cross_entropy_loss,
     compare_gradients_with_manual,
@@ -159,6 +160,60 @@ class TestCrossEntropyLoss:
 
         assert logits.grad is not None, "Gradient should exist"
         assert logits.grad.shape == (2, 3), "Gradient shape incorrect"
+
+    def test_class_matches_function(self):
+        """Test that CrossEntropyLossAutograd class matches convenience function."""
+        logits = Tensor([[2.0, 1.0, 0.1], [0.5, 2.5, 0.3]])
+        targets = np.array([0, 1])
+
+        # Using class
+        loss_fn = CrossEntropyLossAutograd()
+        loss_class = loss_fn(logits, targets)
+
+        # Using function (creates new logits to avoid grad accumulation)
+        logits2 = Tensor([[2.0, 1.0, 0.1], [0.5, 2.5, 0.3]])
+        loss_func = cross_entropy_loss(logits2, targets)
+
+        assert np.allclose(loss_class.data, loss_func.data), \
+            "Class and function should produce same loss"
+
+    def test_matches_manual_loss(self):
+        """Test that autograd loss matches manual CrossEntropyLoss."""
+        from deeplearning.losses import CrossEntropyLoss
+
+        logits_data = np.array([[2.0, 1.0, 0.1], [0.5, 2.5, 0.3]])
+        targets = np.array([0, 1])
+
+        # Manual
+        manual_loss = CrossEntropyLoss()
+        manual_value = manual_loss.forward(logits_data, targets)
+
+        # Autograd
+        logits = Tensor(logits_data)
+        autograd_loss = cross_entropy_loss(logits, targets)
+
+        assert np.allclose(manual_value, autograd_loss.data), \
+            "Autograd loss should match manual implementation"
+
+    def test_gradient_matches_manual(self):
+        """Test that autograd gradient matches manual backward."""
+        from deeplearning.losses import CrossEntropyLoss
+
+        logits_data = np.array([[2.0, 1.0, 0.1], [0.5, 2.5, 0.3]])
+        targets = np.array([0, 1])
+
+        # Manual
+        manual_loss = CrossEntropyLoss()
+        manual_loss.forward(logits_data, targets)
+        manual_grad = manual_loss.backward()
+
+        # Autograd
+        logits = Tensor(logits_data.copy())
+        loss = cross_entropy_loss(logits, targets)
+        loss.backward()
+
+        assert np.allclose(logits.grad, manual_grad), \
+            "Autograd gradient should match manual implementation"
 
 
 class TestTwoLayerMLPAutograd:

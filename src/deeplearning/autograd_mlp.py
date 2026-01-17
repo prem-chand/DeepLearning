@@ -24,8 +24,10 @@ Classes
 - Layer: Base class for all layers
 - LinearAutograd: Fully connected layer using Tensor autograd
 - ReLUAutograd: ReLU activation layer
+- SigmoidAutograd: Sigmoid activation layer
+- TanhAutograd: Tanh activation layer
 - SoftmaxAutograd: Softmax activation layer
-- CrossEntropyLossAutograd: Cross-entropy loss function
+- CrossEntropyLossAutograd: Cross-entropy loss (wraps losses.CrossEntropyLoss)
 - TwoLayerMLPAutograd: Complete 2-layer MLP for MNIST
 
 Example Usage
@@ -39,11 +41,11 @@ Example Usage
 >>> loss = model.train_step(x, y, lr=0.01)
 >>> print(f"Loss: {loss:.4f}")
 
-Author: Deep Learning Assignment - Autograd Extension
+Author: Prem Chand
 """
 
 import numpy as np
-from typing import List, Tuple, Optional, Union
+from typing import List, Union
 from deeplearning.autograd import Tensor
 
 
@@ -205,7 +207,7 @@ def cross_entropy_loss(logits: Tensor, targets: np.ndarray) -> Tensor:
     Compute cross-entropy loss from logits and targets.
 
     This function combines softmax and negative log-likelihood into a single
-    numerically stable operation.
+    numerically stable operation using the log-sum-exp trick.
 
     Parameters
     ----------
@@ -219,9 +221,13 @@ def cross_entropy_loss(logits: Tensor, targets: np.ndarray) -> Tensor:
     Tensor
         Scalar loss tensor
 
-    Mathematical Formulation
-    ------------------------
-    L = -(1/N) * sum_n(log(softmax(logits_n)[targets_n]))
+    Numerical Stability
+    -------------------
+    Uses the log-sum-exp trick to prevent overflow:
+        log(sum(exp(x))) = max(x) + log(sum(exp(x - max(x))))
+
+    The gradient has an elegant closed form:
+        dL/dx_i = (1/N) * (softmax(x)_i - 1{i == target})
 
     Examples
     --------
@@ -231,26 +237,52 @@ def cross_entropy_loss(logits: Tensor, targets: np.ndarray) -> Tensor:
     >>> loss.backward()
     """
     N = logits.shape[0]
+    logits_data = logits.data
 
-    # Compute softmax probabilities
-    probs = logits.softmax(axis=-1)
+    # Numerically stable softmax using log-sum-exp trick
+    shifted = logits_data - np.max(logits_data, axis=1, keepdims=True)
+    exp_shifted = np.exp(shifted)
+    probs = exp_shifted / np.sum(exp_shifted, axis=1, keepdims=True)
 
-    # Get probabilities of correct classes
-    # Create one-hot encoding for indexing
-    log_probs = probs.log()
+    # Cross-entropy loss: -log(prob of correct class)
+    correct_log_probs = -np.log(probs[np.arange(N), targets] + 1e-12)
+    loss_value = np.mean(correct_log_probs)
 
-    # Select the log probabilities for the correct classes
-    # This is equivalent to: -log(probs[arange(N), targets])
-    one_hot = np.zeros_like(logits.data)
-    one_hot[np.arange(N), targets] = 1.0
-    one_hot_tensor = Tensor(one_hot, requires_grad=False)
+    # Create output tensor
+    out = Tensor(np.array(loss_value), (logits,), 'cross_entropy')
 
-    # Compute negative log likelihood
-    # Sum over classes (only the correct class contributes due to one-hot)
-    # Then average over batch
-    nll = -(log_probs * one_hot_tensor).sum() / N
+    def _backward():
+        if logits.requires_grad:
+            # Gradient: (softmax - one_hot) / N
+            grad = probs.copy()
+            grad[np.arange(N), targets] -= 1
+            grad /= N
+            logits.grad += grad
 
-    return nll
+    out._backward = _backward
+    return out
+
+
+# Backward compatibility alias
+class CrossEntropyLossAutograd:
+    """
+    Cross-entropy loss class for autograd tensors.
+
+    This is a stateless class that wraps cross_entropy_loss for API compatibility.
+    For efficiency, prefer using cross_entropy_loss directly.
+
+    Examples
+    --------
+    >>> loss_fn = CrossEntropyLossAutograd()
+    >>> logits = Tensor([[2.0, 1.0, 0.1], [0.5, 2.5, 0.3]])
+    >>> targets = np.array([0, 1])
+    >>> loss = loss_fn(logits, targets)
+    >>> loss.backward()
+    """
+
+    def __call__(self, logits: Tensor, targets: np.ndarray) -> Tensor:
+        """Compute cross-entropy loss."""
+        return cross_entropy_loss(logits, targets)
 
 
 class TwoLayerMLPAutograd:

@@ -13,7 +13,7 @@ Expected Performance:
 Usage:
     python scripts/train_mnist.py
 
-Author: Deep Learning Assignment
+Author: Prem Chand
 """
 
 from __future__ import annotations

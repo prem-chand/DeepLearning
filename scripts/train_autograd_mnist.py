@@ -13,7 +13,7 @@ Expected Performance:
 Usage:
     python scripts/train_autograd_mnist.py
 
-Author: Deep Learning Assignment - Autograd Extension
+Author: Prem Chand
 """
 
 from __future__ import annotations

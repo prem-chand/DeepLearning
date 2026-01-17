@@ -25,7 +25,7 @@ Output:
         ├── test_images.npy     (10000, 784) float32
         └── test_labels.npy     (10000,) int64
 
-Author: Deep Learning Assignment
+Author: Prem Chand
 """
 
 from __future__ import annotations

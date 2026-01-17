@@ -52,7 +52,7 @@ References
 - "Neural Networks and Deep Learning" by Michael Nielsen
 - "Yes you should understand backprop" by Andrej Karpathy
 
-Author: Phase 1 Deep Learning Assignment
+Author: Prem Chand
 """
 
 import numpy as np
